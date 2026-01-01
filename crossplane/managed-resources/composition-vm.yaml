@@ -1,0 +1,255 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: azure-linux-vm
+  labels:
+    provider: azure
+    compute: virtualmachine
+spec:
+  compositeTypeRef:
+    apiVersion: compute.platform.io/v1alpha1
+    kind: XVirtualMachineInstance
+  
+  mode: Pipeline
+  pipeline:
+  - step: patch-and-transform
+    functionRef:
+      name: function-patch-and-transform
+    input:
+      apiVersion: pt.fn.crossplane.io/v1beta1
+      kind: Resources
+      resources:
+      
+      # 1. Virtual Network
+      - name: vnet
+        base:
+          apiVersion: network.azure.upbound.io/v1beta1
+          kind: VirtualNetwork
+          spec:
+            forProvider:
+              location: East US
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+              addressSpace:
+                - "10.0.0.0/16"
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-vnet"
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.environment
+            toFieldPath: metadata.labels[environment]
+      
+      # 2. Subnet
+      - name: subnet
+        base:
+          apiVersion: network.azure.upbound.io/v1beta1
+          kind: Subnet
+          spec:
+            forProvider:
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+              virtualNetworkNameSelector:
+                matchControllerRef: true
+              addressPrefixes:
+                - "10.0.1.0/24"
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-subnet"
+      
+      # 3. Public IP
+      - name: publicip
+        base:
+          apiVersion: network.azure.upbound.io/v1beta1
+          kind: PublicIP
+          spec:
+            forProvider:
+              location: East US
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+              allocationMethod: Static
+              sku: Standard
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-pip"
+          - type: ToCompositeFieldPath
+            fromFieldPath: status.atProvider.ipAddress
+            toFieldPath: status.publicIP
+      
+      # 4. Network Security Group
+      - name: nsg
+        base:
+          apiVersion: network.azure.upbound.io/v1beta1
+          kind: SecurityGroup
+          spec:
+            forProvider:
+              location: East US
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-nsg"
+      
+      # 5. NSG Rule - Allow SSH
+      - name: nsg-rule-ssh
+        base:
+          apiVersion: network.azure.upbound.io/v1beta1
+          kind: SecurityRule
+          spec:
+            forProvider:
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+              networkSecurityGroupNameSelector:
+                matchControllerRef: true
+              priority: 1001
+              direction: Inbound
+              access: Allow
+              protocol: Tcp
+              sourcePortRange: "*"
+              destinationPortRange: "22"
+              sourceAddressPrefix: "*"
+              destinationAddressPrefix: "*"
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-allow-ssh"
+      
+      # 6. Network Interface
+      - name: nic
+        base:
+          apiVersion: network.azure.upbound.io/v1beta1
+          kind: NetworkInterface
+          spec:
+            forProvider:
+              location: East US
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+              ipConfiguration:
+                - name: internal
+                  primary: true
+                  subnetIdSelector:
+                    matchControllerRef: true
+                  privateIpAddressAllocation: Dynamic
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-nic"
+          - type: ToCompositeFieldPath
+            fromFieldPath: status.atProvider.ipConfiguration[0].privateIpAddress
+            toFieldPath: status.privateIP
+      
+      # 7. NSG Association to NIC
+      - name: nic-nsg-association
+        base:
+          apiVersion: network.azure.upbound.io/v1beta1
+          kind: NetworkInterfaceSecurityGroupAssociation
+          spec:
+            forProvider:
+              networkInterfaceIdSelector:
+                matchControllerRef: true
+              networkSecurityGroupIdSelector:
+                matchControllerRef: true
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-nic-nsg"
+      
+      # 8. Linux Virtual Machine
+      - name: vm
+        base:
+          apiVersion: compute.azure.upbound.io/v1beta1
+          kind: LinuxVirtualMachine
+          spec:
+            forProvider:
+              location: East US
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+              size: Standard_B1s
+              adminUsername: azureuser
+              disablePasswordAuthentication: true
+              adminSshKey:
+                - username: azureuser
+                  publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC1BIyLfSDNPumww8CpqY2ljNbhFXA29TqSbY0lgPhISUXd/IHHtC7GpfUZpATBIx2rU8bncWZUaWs3j9KW+MUke1JmtCwL/zpndNYTm1a6KhR9aDEJFWv5Efl/d9ATYAH/GK3pme+rvVOzbvBsYFFES39wtAvgRTolFZsv3PEiKQXGCNzNYuLQ7fs/MfRP7asd82SfQEUnj8DX5kzrMNIPn1I/3/Wncwfp7t/EIWxyvIpY1CAK0xNlpvnPKTfZAc6HHS0Vt7DbOsvBSaSNh3a0Qs+egompAB9QxV2ZNJ9cb4nbZ9tbnI45AVMGmby1kraYG+R+SIAOqZtgfvFRJthF crossplane-lab-test"
+              networkInterfaceIdsSelector:
+                matchControllerRef: true
+              osDisk:
+                - caching: ReadWrite
+                  storageAccountType: Standard_LRS
+              sourceImageReference:
+                - publisher: Canonical
+                  offer: 0001-com-ubuntu-server-jammy
+                  sku: "22_04-lts-gen2"
+                  version: latest
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.size
+            toFieldPath: spec.forProvider.size
+            transforms:
+              - type: map
+                map:
+                  small: Standard_B1s
+                  medium: Standard_B2s
+                  large: Standard_D2s_v3
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.diskSizeGB
+            toFieldPath: spec.forProvider.osDisk[0].diskSizeGb
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.adminUsername
+            toFieldPath: spec.forProvider.adminUsername
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.adminUsername
+            toFieldPath: spec.forProvider.adminSshKey[0].username
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.environment
+            toFieldPath: metadata.labels[environment]
+          - type: ToCompositeFieldPath
+            fromFieldPath: status.atProvider.id
+            toFieldPath: status.vmId

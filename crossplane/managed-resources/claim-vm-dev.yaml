@@ -1,0 +1,15 @@
+apiVersion: compute.platform.io/v1alpha1
+kind: VirtualMachineInstance
+metadata:
+  name: backend-vm-dev
+  namespace: app-backend
+spec:
+  compositionSelector:
+    matchLabels:
+      provider: azure
+      compute: virtualmachine
+  parameters:
+    size: small
+    diskSizeGB: 30
+    environment: dev
+    adminUsername: azureuser

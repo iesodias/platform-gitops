@@ -1,0 +1,72 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: xvirtualmachineinstances.compute.platform.io
+spec:
+  group: compute.platform.io
+  names:
+    kind: XVirtualMachineInstance
+    plural: xvirtualmachineinstances
+  claimNames:
+    kind: VirtualMachineInstance
+    plural: virtualmachineinstances
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              parameters:
+                type: object
+                properties:
+                  size:
+                    type: string
+                    description: "VM size: small, medium, or large"
+                    enum:
+                      - small
+                      - medium
+                      - large
+                    default: small
+                  diskSizeGB:
+                    type: integer
+                    description: "OS disk size in GB"
+                    default: 30
+                    minimum: 30
+                    maximum: 1024
+                  environment:
+                    type: string
+                    description: "Environment: dev, staging, or prod"
+                    enum:
+                      - dev
+                      - staging
+                      - prod
+                    default: dev
+                  adminUsername:
+                    type: string
+                    description: "Admin username for SSH access"
+                    default: "azureuser"
+                required:
+                  - size
+                  - environment
+            required:
+              - parameters
+          status:
+            type: object
+            properties:
+              vmId:
+                type: string
+                description: "Azure VM resource ID"
+              publicIP:
+                type: string
+                description: "Public IP address"
+              privateIP:
+                type: string
+                description: "Private IP address"
+              state:
+                type: string
+                description: "VM provisioning state"
