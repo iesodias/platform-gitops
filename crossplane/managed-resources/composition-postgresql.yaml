@@ -47,11 +47,20 @@ spec:
               backupRetentionDays: 7
               geoRedundantBackupEnabled: false
             writeConnectionSecretToRef:
+              name: ""
               namespace: crossplane-system
         patches:
           - type: FromCompositeFieldPath
             fromFieldPath: metadata.name
             toFieldPath: metadata.name
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: spec.writeConnectionSecretToRef.name
+            transforms:
+              - type: string
+                string:
+                  type: Format
+                  fmt: "%s-conn"
           - type: FromCompositeFieldPath
             fromFieldPath: spec.parameters.storageGB
             toFieldPath: spec.forProvider.storageMb
