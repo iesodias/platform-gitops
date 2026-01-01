@@ -33,6 +33,10 @@ spec:
                 matchLabels:
                   platform: labs
               administratorLogin: platformadmin
+              administratorLoginPasswordSecretRef:
+                name: postgresql-admin-password
+                namespace: crossplane-system
+                key: password
               skuName: B_Gen5_1
               storageMb: 20480
               version: "11"
