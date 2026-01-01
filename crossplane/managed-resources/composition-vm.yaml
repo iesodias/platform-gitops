@@ -95,6 +95,9 @@ spec:
           - type: ToCompositeFieldPath
             fromFieldPath: status.atProvider.ipAddress
             toFieldPath: status.publicIP
+          - type: ToCompositeFieldPath
+            fromFieldPath: status.atProvider.id
+            toFieldPath: status.publicIPId
       
       # 4. Network Security Group
       - name: nsg
@@ -173,6 +176,9 @@ spec:
                 string:
                   type: Format
                   fmt: "%s-nic"
+          - type: FromCompositeFieldPath
+            fromFieldPath: status.publicIPId
+            toFieldPath: spec.forProvider.ipConfiguration[0].publicIpAddressId
           - type: ToCompositeFieldPath
             fromFieldPath: status.atProvider.ipConfiguration[0].privateIpAddress
             toFieldPath: status.privateIP
@@ -211,7 +217,11 @@ spec:
                   platform: labs
               size: Standard_B1s
               adminUsername: azureuser
-              disablePasswordAuthentication: true
+              disablePasswordAuthentication: false
+              adminPasswordSecretRef:
+                namespace: crossplane-system
+                name: vm-admin-password
+                key: password
               adminSshKey:
                 - username: azureuser
                   publicKey: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC1BIyLfSDNPumww8CpqY2ljNbhFXA29TqSbY0lgPhISUXd/IHHtC7GpfUZpATBIx2rU8bncWZUaWs3j9KW+MUke1JmtCwL/zpndNYTm1a6KhR9aDEJFWv5Efl/d9ATYAH/GK3pme+rvVOzbvBsYFFES39wtAvgRTolFZsv3PEiKQXGCNzNYuLQ7fs/MfRP7asd82SfQEUnj8DX5kzrMNIPn1I/3/Wncwfp7t/EIWxyvIpY1CAK0xNlpvnPKTfZAc6HHS0Vt7DbOsvBSaSNh3a0Qs+egompAB9QxV2ZNJ9cb4nbZ9tbnI45AVMGmby1kraYG+R+SIAOqZtgfvFRJthF crossplane-lab-test"

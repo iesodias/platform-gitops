@@ -64,6 +64,9 @@ spec:
               publicIP:
                 type: string
                 description: "Public IP address"
+              publicIPId:
+                type: string
+                description: "Azure Public IP resource ID"
               privateIP:
                 type: string
                 description: "Private IP address"
