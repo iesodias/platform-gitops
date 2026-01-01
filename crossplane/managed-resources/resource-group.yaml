@@ -1,0 +1,9 @@
+apiVersion: azure.upbound.io/v1beta1
+kind: ResourceGroup
+metadata:
+  name: platform-labs-crossplane
+spec:
+  forProvider:
+    location: East US
+  providerConfigRef:
+    name: default

@@ -1,0 +1,102 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: azure-postgresql
+  labels:
+    provider: azure
+    database: postgresql
+spec:
+  compositeTypeRef:
+    apiVersion: database.platform.io/v1alpha1
+    kind: XPostgreSQLInstance
+  
+  writeConnectionSecretsToNamespace: crossplane-system
+  
+  mode: Pipeline
+  pipeline:
+  - step: patch-and-transform
+    functionRef:
+      name: function-patch-and-transform
+    input:
+      apiVersion: pt.fn.crossplane.io/v1beta1
+      kind: Resources
+      resources:
+      # 1. PostgreSQL Server
+      - name: postgresqlserver
+        base:
+          apiVersion: dbforpostgresql.azure.upbound.io/v1beta1
+          kind: Server
+          spec:
+            forProvider:
+              location: East US
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+              administratorLogin: platformadmin
+              skuName: B_Gen5_1
+              storageMb: 20480
+              version: "11"
+              sslEnforcementEnabled: true
+              sslMinimalTlsVersionEnforced: "TLS1_2"
+              publicNetworkAccessEnabled: true
+              autoGrowEnabled: true
+              backupRetentionDays: 7
+              geoRedundantBackupEnabled: false
+            writeConnectionSecretToRef:
+              namespace: crossplane-system
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.storageGB
+            toFieldPath: spec.forProvider.storageMb
+            transforms:
+              - type: math
+                math:
+                  multiply: 1024
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.size
+            toFieldPath: spec.forProvider.skuName
+            transforms:
+              - type: map
+                map:
+                  small: B_Gen5_1
+                  medium: GP_Gen5_2
+                  large: GP_Gen5_4
+          - type: FromCompositeFieldPath
+            fromFieldPath: spec.parameters.environment
+            toFieldPath: metadata.labels[environment]
+          - type: ToCompositeFieldPath
+            fromFieldPath: status.atProvider.fqdn
+            toFieldPath: status.endpoint
+        connectionDetails:
+          - name: endpoint
+            fromConnectionSecretKey: attribute.fqdn
+          - name: username
+            fromFieldPath: spec.forProvider.administratorLogin
+          - name: password
+            fromConnectionSecretKey: attribute.administratorLoginPassword
+      
+      # 2. Firewall Rule (allow Azure services)
+      - name: firewallrule
+        base:
+          apiVersion: dbforpostgresql.azure.upbound.io/v1beta1
+          kind: FirewallRule
+          spec:
+            forProvider:
+              startIpAddress: "0.0.0.0"
+              endIpAddress: "0.0.0.0"
+              serverNameSelector:
+                matchControllerRef: true
+              resourceGroupNameSelector:
+                matchLabels:
+                  platform: labs
+        patches:
+          - type: FromCompositeFieldPath
+            fromFieldPath: metadata.name
+            toFieldPath: metadata.name
+            transforms:
+              - type: string
+                string:
+                  fmt: "%s-allow-azure"
