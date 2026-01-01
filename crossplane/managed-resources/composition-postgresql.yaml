@@ -73,10 +73,13 @@ spec:
             toFieldPath: status.endpoint
         connectionDetails:
           - name: endpoint
+            type: FromConnectionSecretKey
             fromConnectionSecretKey: attribute.fqdn
           - name: username
+            type: FromFieldPath
             fromFieldPath: spec.forProvider.administratorLogin
           - name: password
+            type: FromConnectionSecretKey
             fromConnectionSecretKey: attribute.administratorLoginPassword
       
       # 2. Firewall Rule (allow Azure services)
