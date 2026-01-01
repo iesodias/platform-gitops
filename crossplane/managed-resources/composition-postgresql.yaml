@@ -54,6 +54,7 @@ spec:
             transforms:
               - type: math
                 math:
+                  type: Multiply
                   multiply: 1024
           - type: FromCompositeFieldPath
             fromFieldPath: spec.parameters.size
