@@ -103,4 +103,5 @@ spec:
             transforms:
               - type: string
                 string:
+                  type: Format
                   fmt: "%s-allow-azure"
