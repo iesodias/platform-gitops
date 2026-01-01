@@ -25,7 +25,7 @@ spec:
       - name: postgresqlserver
         base:
           apiVersion: dbforpostgresql.azure.upbound.io/v1beta1
-          kind: Server
+          kind: FlexibleServer
           spec:
             forProvider:
               location: East US
@@ -33,17 +33,13 @@ spec:
                 matchLabels:
                   platform: labs
               administratorLogin: platformadmin
-              administratorLoginPasswordSecretRef:
+              administratorPasswordSecretRef:
                 name: postgresql-admin-password
                 namespace: crossplane-system
                 key: password
-              skuName: B_Gen5_1
-              storageMb: 20480
-              version: "11"
-              sslEnforcementEnabled: true
-              sslMinimalTlsVersionEnforced: "TLS1_2"
-              publicNetworkAccessEnabled: true
-              autoGrowEnabled: true
+              skuName: B_Standard_B1ms
+              storageMb: 32768
+              version: "13"
               backupRetentionDays: 7
               geoRedundantBackupEnabled: false
             writeConnectionSecretToRef:
@@ -75,9 +71,9 @@ spec:
             transforms:
               - type: map
                 map:
-                  small: B_Gen5_1
-                  medium: GP_Gen5_2
-                  large: GP_Gen5_4
+                  small: B_Standard_B1ms
+                  medium: GP_Standard_D2s_v3
+                  large: GP_Standard_D4s_v3
           - type: FromCompositeFieldPath
             fromFieldPath: spec.parameters.environment
             toFieldPath: metadata.labels[environment]
@@ -93,22 +89,19 @@ spec:
             fromFieldPath: spec.forProvider.administratorLogin
           - name: password
             type: FromConnectionSecretKey
-            fromConnectionSecretKey: attribute.administratorLoginPassword
+            fromConnectionSecretKey: attribute.administratorPassword
       
       # 2. Firewall Rule (allow Azure services)
       - name: firewallrule
         base:
           apiVersion: dbforpostgresql.azure.upbound.io/v1beta1
-          kind: FirewallRule
+          kind: FlexibleServerFirewallRule
           spec:
             forProvider:
               startIpAddress: "0.0.0.0"
               endIpAddress: "0.0.0.0"
-              serverNameSelector:
+              serverIdSelector:
                 matchControllerRef: true
-              resourceGroupNameSelector:
-                matchLabels:
-                  platform: labs
         patches:
           - type: FromCompositeFieldPath
             fromFieldPath: metadata.name
