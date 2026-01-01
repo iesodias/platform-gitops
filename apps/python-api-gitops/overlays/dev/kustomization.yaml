@@ -9,7 +9,7 @@ resources:
 images:
   - name: python-api-gitops
     newName: iesodias/python-api-gitops
-    newTag: latest
+    newTag: b6220a5
 
 patches:
   - target:
